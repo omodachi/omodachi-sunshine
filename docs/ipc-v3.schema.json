@@ -1,0 +1,1103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Managed Sunshine v3 private JSONL IPC",
+  "description": "Producer/consumer shape contract for source freeze v3 plus the PLUG-4 persistent certificate revoke. The runtime additionally checks byte limits, duplicate keys, current request identity, matching lease/output/identity fields, monotonic generations, and stop fences.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/request"
+    },
+    {
+      "$ref": "#/$defs/response"
+    }
+  ],
+  "$defs": {
+    "fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 of the canonical DER client leaf certificate."
+    },
+    "requestId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "dimensions": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 16384
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 16384
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "additionalProperties": false
+    },
+    "observedDimensions": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16384
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16384
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "additionalProperties": false
+    },
+    "lease": {
+      "type": "object",
+      "properties": {
+        "lease_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "lease_epoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "owner_device_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "client_cert_sha256": {
+          "$ref": "#/$defs/fingerprint"
+        }
+      },
+      "required": [
+        "lease_id",
+        "lease_epoch",
+        "owner_device_id",
+        "client_cert_sha256"
+      ],
+      "additionalProperties": false
+    },
+    "identity": {
+      "type": "object",
+      "properties": {
+        "lease_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "lease_epoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "transition_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "geometry_epoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "connection_generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "lease_id",
+        "lease_epoch",
+        "transition_id",
+        "geometry_epoch",
+        "connection_generation"
+      ],
+      "additionalProperties": false
+    },
+    "outputId": {
+      "type": "string",
+      "pattern": "^OMODACHI-[a-f0-9]{16}$"
+    },
+    "profile": {
+      "type": "object",
+      "properties": {
+        "output_id": {
+          "$ref": "#/$defs/outputId"
+        },
+        "strategy": {
+          "const": "headless"
+        },
+        "codec": {
+          "enum": [
+            "h264",
+            "hevc"
+          ]
+        },
+        "dynamic_range": {
+          "const": "sdr"
+        },
+        "transform": {
+          "const": 0
+        },
+        "output_mode_pixels": {
+          "$ref": "#/$defs/dimensions"
+        },
+        "stream_pixels": {
+          "$ref": "#/$defs/dimensions"
+        }
+      },
+      "required": [
+        "output_id",
+        "strategy",
+        "codec",
+        "dynamic_range",
+        "transform",
+        "output_mode_pixels",
+        "stream_pixels"
+      ],
+      "additionalProperties": true
+    },
+    "pairingRequest": {
+      "type": "object",
+      "properties": {
+        "request_id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "client_cert_sha256": {
+          "$ref": "#/$defs/fingerprint"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "awaiting_client_proof",
+            "paired",
+            "failed",
+            "cancelled",
+            "expired"
+          ]
+        },
+        "expires_in_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "request_id",
+        "client_cert_sha256",
+        "status",
+        "expires_in_ms"
+      ],
+      "additionalProperties": false
+    },
+    "request": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "pairing.list"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "pairing.pending"
+            },
+            "request_id": {
+              "$ref": "#/$defs/requestId"
+            },
+            "client_cert_sha256": {
+              "$ref": "#/$defs/fingerprint"
+            }
+          },
+          "required": [
+            "op",
+            "request_id",
+            "client_cert_sha256"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "pairing.cancel"
+            },
+            "request_id": {
+              "$ref": "#/$defs/requestId"
+            },
+            "client_cert_sha256": {
+              "$ref": "#/$defs/fingerprint"
+            }
+          },
+          "required": [
+            "op",
+            "request_id",
+            "client_cert_sha256"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "pairing.clients"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "pairing.revoke"
+            },
+            "client_cert_sha256": {
+              "$ref": "#/$defs/fingerprint"
+            }
+          },
+          "required": [
+            "op",
+            "client_cert_sha256"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "pairing.approve"
+            },
+            "request_id": {
+              "$ref": "#/$defs/requestId"
+            },
+            "client_cert_sha256": {
+              "$ref": "#/$defs/fingerprint"
+            },
+            "pin": {
+              "type": "string",
+              "pattern": "^[0-9]{4}$",
+              "writeOnly": true
+            },
+            "name": {
+              "type": "string",
+              "pattern": "^[^\\u0000-\\u001f\\u007f]*$",
+              "maxLength": 80,
+              "description": "Also limited to 80 UTF-8 bytes at runtime; JSON Schema maxLength counts characters."
+            }
+          },
+          "required": [
+            "op",
+            "request_id",
+            "client_cert_sha256",
+            "pin",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "media.list"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "media.get"
+            },
+            "session_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+            }
+          },
+          "required": [
+            "op",
+            "session_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "desktop.status"
+            },
+            "protocol": {
+              "const": "omodachi.sunshine.desktop.v1"
+            }
+          },
+          "required": [
+            "op",
+            "protocol"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "desktop.claim"
+            },
+            "protocol": {
+              "const": "omodachi.sunshine.desktop.v1"
+            },
+            "lease": {
+              "$ref": "#/$defs/lease"
+            },
+            "output_id": {
+              "$ref": "#/$defs/outputId"
+            }
+          },
+          "required": [
+            "op",
+            "protocol",
+            "lease",
+            "output_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "desktop.prepare"
+            },
+            "protocol": {
+              "const": "omodachi.sunshine.desktop.v1"
+            },
+            "lease": {
+              "$ref": "#/$defs/lease"
+            },
+            "identity": {
+              "$ref": "#/$defs/identity"
+            },
+            "output_id": {
+              "$ref": "#/$defs/outputId"
+            },
+            "profile": {
+              "$ref": "#/$defs/profile"
+            }
+          },
+          "required": [
+            "op",
+            "protocol",
+            "lease",
+            "identity",
+            "output_id",
+            "profile"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "desktop.session"
+            },
+            "protocol": {
+              "const": "omodachi.sunshine.desktop.v1"
+            },
+            "lease": {
+              "$ref": "#/$defs/lease"
+            }
+          },
+          "required": [
+            "op",
+            "protocol",
+            "lease"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "desktop.stop"
+            },
+            "protocol": {
+              "const": "omodachi.sunshine.desktop.v1"
+            },
+            "lease": {
+              "$ref": "#/$defs/lease"
+            }
+          },
+          "required": [
+            "op",
+            "protocol",
+            "lease"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "op": {
+              "const": "desktop.release"
+            },
+            "protocol": {
+              "const": "omodachi.sunshine.desktop.v1"
+            },
+            "lease": {
+              "$ref": "#/$defs/lease"
+            }
+          },
+          "required": [
+            "op",
+            "protocol",
+            "lease"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "mediaSession": {
+      "type": "object",
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "launch_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "capture_generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "enum": [
+            "starting",
+            "selected",
+            "encoding_captured_frames",
+            "encoding_without_capture_yet",
+            "video_ended",
+            "stopped"
+          ]
+        },
+        "video_ended": {
+          "type": "boolean"
+        },
+        "stop_complete": {
+          "type": "boolean"
+        },
+        "capture_backend": {
+          "type": "string"
+        },
+        "selected_output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "selection_source": {
+          "enum": [
+            "unobserved",
+            "selected_wlr_display_instance"
+          ]
+        },
+        "output_pixels": {
+          "$ref": "#/$defs/observedDimensions"
+        },
+        "logical_size": {
+          "$ref": "#/$defs/observedDimensions"
+        },
+        "output_offset": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "integer"
+            },
+            "y": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ],
+          "additionalProperties": false
+        },
+        "captured_frames": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "encoded_packets": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "last_encoded_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "captured_pixels": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/observedDimensions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "encoded_pixels": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/observedDimensions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "codec": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "encoder_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "encoder_backend": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "video_codec": {
+          "enum": [
+            null,
+            "h264",
+            "hevc",
+            "av1",
+            "unknown"
+          ]
+        },
+        "encoded_geometry_source": {
+          "enum": [
+            null,
+            "avcodec_frame_after_packet",
+            "nvenc_picture_after_bitstream"
+          ]
+        },
+        "client_presented": {
+          "type": "null"
+        },
+        "bitstream_dimensions_independently_parsed": {
+          "const": false
+        }
+      },
+      "required": [
+        "session_id",
+        "launch_id",
+        "generation",
+        "capture_generation",
+        "status",
+        "video_ended",
+        "stop_complete",
+        "capture_backend",
+        "selected_output",
+        "selection_source",
+        "output_pixels",
+        "logical_size",
+        "output_offset",
+        "captured_frames",
+        "encoded_packets",
+        "last_encoded_frame",
+        "captured_pixels",
+        "encoded_pixels",
+        "codec",
+        "encoder_name",
+        "encoder_backend",
+        "video_codec",
+        "encoded_geometry_source",
+        "client_presented",
+        "bitstream_dimensions_independently_parsed"
+      ],
+      "additionalProperties": false
+    },
+    "desktopResult": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "available": {
+              "type": "boolean"
+            },
+            "backend": {
+              "enum": [
+                "wlr",
+                "unavailable"
+              ]
+            },
+            "encoder": {
+              "enum": [
+                "vaapi",
+                "unavailable"
+              ]
+            },
+            "encoders": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "prefixItems": [
+                {
+                  "const": "h264"
+                }
+              ],
+              "items": {
+                "enum": [
+                  "h264",
+                  "hevc"
+                ]
+              }
+            }
+          },
+          "required": [
+            "available",
+            "backend",
+            "encoder",
+            "encoders"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "lease": {
+              "$ref": "#/$defs/lease"
+            },
+            "identity": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identity"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "configured_output_id": {
+              "$ref": "#/$defs/outputId"
+            },
+            "prepared": {
+              "type": "boolean"
+            },
+            "session_count": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "stopped": {
+              "type": "boolean"
+            },
+            "media_session_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "media_generation": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "capture_generation": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "lease",
+            "identity",
+            "configured_output_id",
+            "prepared",
+            "session_count",
+            "stopped",
+            "media_session_id",
+            "media_generation",
+            "capture_generation"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "lease": {
+              "$ref": "#/$defs/lease"
+            },
+            "identity": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identity"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "configured_output_id": {
+              "$ref": "#/$defs/outputId"
+            },
+            "prepared": {
+              "type": "boolean"
+            },
+            "session_count": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "stopped": {
+              "type": "boolean"
+            },
+            "media_session_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "media_generation": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "capture_generation": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "released": {
+              "const": true
+            }
+          },
+          "required": [
+            "lease",
+            "identity",
+            "configured_output_id",
+            "prepared",
+            "session_count",
+            "stopped",
+            "media_session_id",
+            "media_generation",
+            "capture_generation",
+            "released"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "response": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "requests": {
+              "type": "array",
+              "maxItems": 72,
+              "items": {
+                "$ref": "#/$defs/pairingRequest"
+              }
+            },
+            "certificate_revocation_supported": {
+              "const": true,
+              "description": "Present and true only on a build that implements pairing.revoke. Its absence means persistent revocation is unavailable and a caller must keep its own revoke unresolved."
+            }
+          },
+          "required": [
+            "ok",
+            "requests"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "request": {
+              "$ref": "#/$defs/pairingRequest"
+            },
+            "certificate_revocation_supported": {
+              "const": true,
+              "description": "Present and true only on a build that implements pairing.revoke. Its absence means persistent revocation is unavailable and a caller must keep its own revoke unresolved."
+            }
+          },
+          "required": [
+            "ok",
+            "request"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "accepted": {
+              "const": true
+            },
+            "request_id": {
+              "$ref": "#/$defs/requestId"
+            },
+            "status": {
+              "const": "awaiting_client_proof"
+            }
+          },
+          "required": [
+            "ok",
+            "accepted",
+            "request_id",
+            "status"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "clients": {
+              "type": "array",
+              "maxItems": 64,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "client_cert_sha256": {
+                    "$ref": "#/$defs/fingerprint"
+                  },
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[^\\u0000-\\u001f\\u007f]*$",
+                    "maxLength": 80,
+                    "description": "The display name the record already carried; it is not an identity and nothing may authorize on it."
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "client_cert_sha256",
+                  "name",
+                  "enabled"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "unreadable": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Records whose stored certificate does not parse, so they have no fingerprint and cannot be revoked by one."
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "ok",
+            "clients",
+            "unreadable",
+            "truncated"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "status": {
+              "enum": [
+                "revoked",
+                "not_found"
+              ],
+              "description": "revoked: the certificate was authorized here and is gone, and any stream it authorized was signalled to stop. not_found: no authorized record carried this certificate."
+            }
+          },
+          "required": [
+            "ok",
+            "status"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "sessions": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "$ref": "#/$defs/mediaSession"
+              }
+            }
+          },
+          "required": [
+            "ok",
+            "sessions"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "session": {
+              "$ref": "#/$defs/mediaSession"
+            }
+          },
+          "required": [
+            "ok",
+            "session"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "protocol": {
+              "const": "omodachi.sunshine.desktop.v1"
+            },
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "$ref": "#/$defs/desktopResult"
+            }
+          },
+          "required": [
+            "protocol",
+            "ok",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": false
+            },
+            "error": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code"
+              ],
+              "additionalProperties": false
+            },
+            "protocol": {
+              "const": "omodachi.sunshine.desktop.v1"
+            }
+          },
+          "required": [
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}
