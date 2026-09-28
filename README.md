@@ -33,6 +33,28 @@
 > named exactly as the script wrote it. `omodachi-core` pins that URL and the
 > archive's sha256 in its `data/versions.json`, so the name must not change.
 >
+> **The source of a release.** The fork's source for a release is this
+> repository at the commit its tag names, the vendored third-party trees
+> included; the upstream base and the locked submodule commits are in
+> [FORK.md](FORK.md). The same tree is attached to the release as a source
+> archive. For `sunshine-328d231` it is
+> [`omodachi-sunshine-328d231-source.tar.gz`](https://github.com/omodachi/omodachi-sunshine/releases/download/sunshine-328d231/omodachi-sunshine-328d231-source.tar.gz),
+> with its sha256 in `SHA256SUMS` beside it. The package is also built from
+> three things outside this tree, which `scripts/package_release.sh` points
+> cmake at: a prepared static FFmpeg (the `ffmpeg-v2026.910.121303` build of
+> LizardByte's build-deps, which links in x264, x265 and SVT-AV1), and the
+> Boost 1.89.0 and nlohmann-json 3.11.3 sources that `cmake/dependencies/`
+> names. Their sources are attached to the same release: build-deps at the
+> commit that built that FFmpeg, with its recipes, patches and CI workflow;
+> FFmpeg, x264, x265 and SVT-AV1 at the commits it used; the AMF,
+> nv-codec-headers, Vulkan and libva sources it was compiled against; and the
+> Boost and nlohmann-json archives `cmake/dependencies/` pins. The release's
+> notes say which part of the binary each one built, and `SHA256SUMS` lists
+> them all.
+>
+> **Security reports** go to GitHub's private reporting on this repository or
+> to security@omodachi.app; see [SECURITY.md](SECURITY.md).
+>
 > Sunshine is **GPL-3.0-only** and so is this fork. See [LICENSE](LICENSE) and
 > [NOTICE](NOTICE). Do not open issues about this fork upstream; use
 > <https://github.com/omodachi/omodachi-sunshine/issues>.
