@@ -1,0 +1,37 @@
+# The build machine of release sunshine-e9f1b08, rebuilt from public parts.
+#
+# The base image is pinned by digest, but its own package versions do not
+# matter: every package of packages.txt (the `pacman -Q` of the original build
+# machine, 245 packages) is installed again from the Arch Linux Archive as the
+# Arch repositories stood on 2026-09-28, downgrading or upgrading as needed,
+# and the build stops unless `pacman -Q` then equals packages.txt exactly.
+FROM docker.io/library/archlinux:base-20260927.0.600689@sha256:b21322c663be387c0ed9cbc7bbbfe18e41633ad4e7b7c77cfad45f128be20040
+
+COPY packages.txt python-tools.txt /reproduce/
+
+# The image's pacman.conf skips man pages, locales and docs (NoExtract); the
+# original machine had them, so the lines go and every package is reinstalled.
+RUN set -eu; \
+    echo 'Server = https://archive.archlinux.org/repos/2026/09/28/$repo/os/$arch' > /etc/pacman.d/mirrorlist; \
+    sed -i '/^NoExtract/d' /etc/pacman.conf; \
+    pacman -Syyuu --noconfirm --overwrite '*' $(cut -d' ' -f1 /reproduce/packages.txt); \
+    cut -d' ' -f1 /reproduce/packages.txt > /tmp/names; \
+    extra=$(pacman -Qq | grep -vxF -f /tmp/names || true); rm /tmp/names; \
+    if [ -n "$extra" ]; then pacman -Rdd --noconfirm $extra; fi; \
+    pacman -Q | diff -u /reproduce/packages.txt -; \
+    rm -rf /var/cache/pacman/pkg/*
+
+# The same user and directories as the original build: nothing under anyone's
+# home, the checkout in /build/src, the build in /build/out, the dependencies in
+# /build/deps, the Python tools (Jinja2 for the GLAD generator) in /build/tools.
+RUN set -eu; \
+    useradd -u 1000 -U -d /build/home -M -s /bin/bash build; \
+    mkdir -p /build/src /build/out /build/deps /build/tools /build/home; \
+    chown -R build:build /build
+USER build
+ENV HOME=/build/home LANG=C.UTF-8 TZ=UTC
+RUN python3 -m venv /build/tools/venv && \
+    /build/tools/venv/bin/pip install --no-cache-dir --no-deps --require-hashes -r /reproduce/python-tools.txt
+
+COPY build.sh compare.sh /reproduce/
+WORKDIR /build

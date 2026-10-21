@@ -1,0 +1,78 @@
+# Rebuild release sunshine-e9f1b08 from commit e9f1b089255e235b5e6aa13ed89b7dd3f569de87
+# on a GitHub-hosted runner and compare it, byte for byte, with the published
+# archive. See reproduce/README.md.
+#
+# What the attestation at the end binds, and what it does not:
+# - It is signed by GitHub's Sigstore instance for this workflow file, at the
+#   commit the run was started from, in this repository, in this run. It says:
+#   "this run produced an artifact with SHA-256 1d13e3aa…cef7".
+# - It does not by itself say "built from e9f1b08". That link is inside the
+#   run: build.sh checks out e9f1b08 and checks its commit and tree ids, and
+#   compare.sh shows the rebuilt archive equals the published one. Both are in
+#   the run's public log and in the compare-log artifact.
+# - The run passes --built-on with the original build machine's kernel name
+#   (the one line of SOURCE that depends on the machine), so the archive this
+#   run builds is itself byte-identical to the published one. The step attests
+#   that rebuilt file, and only runs when its SHA-256 is the published digest.
+name: reproduce sunshine-e9f1b08
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      ARCHIVE: omodachi-sunshine-e9f1b08-x86_64.tar.zst
+      DIGEST: 1d13e3aa16ef7bd68daba216a01701f4f06630135f7ddc40a68f56234c98cef7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: rebuild and compare
+        id: compare
+        run: |
+          set +e
+          reproduce/reproduce.sh --built-on 'Linux 6.19.11-zabbly+ x86_64'
+          status=$?
+          set -e
+          if [ "$status" = 0 ] && [ "$(tail -n 1 reproduce-out/compare.log)" = "RESULT: MATCH $DIGEST" ]; then
+            echo "match=true" >> "$GITHUB_OUTPUT"
+          fi
+          exit "$status"
+
+      - name: upload logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: compare-log
+          path: |
+            reproduce-out/build.log
+            reproduce-out/compare.log
+
+      - name: check the rebuilt file's digest
+        if: steps.compare.outputs.match == 'true'
+        run: |
+          echo "$DIGEST  reproduce-out/rebuilt-$ARCHIVE" | sha256sum -c -
+          cp "reproduce-out/rebuilt-$ARCHIVE" "$ARCHIVE"
+
+      - name: attest the digest
+        if: steps.compare.outputs.match == 'true'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ env.ARCHIVE }}
+
+      - name: verify the attestation on the published file
+        if: steps.compare.outputs.match == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh attestation verify "reproduce-out/published-$ARCHIVE" -R "$GITHUB_REPOSITORY"
